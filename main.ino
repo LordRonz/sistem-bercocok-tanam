@@ -1,13 +1,21 @@
 #include <DS3231.h>
+#include <LowPower.h>
 #include <Wire.h>
 #include <MD_Parola.h>
 #include <MD_MAX72xx.h>
 #include <SPI.h>
 
+// MAX7219
 // Define hardware type, size, and output pins:
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 4
 #define CS_PIN 3
+
+// LDR
+#define LDR_PIN A0
+
+// LM35
+#define LM35_PIN A1
 
 // Create a new instance of the MD_Parola class with hardware SPI connection:
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
@@ -69,18 +77,33 @@ void setup() {
 void loop() {
     switch(state) {
         case nama:
-            setNama();
+            setTemp();
             break;
         case waktu:
             setTime();
             break;
     }
 
+    myDisplay.setIntensity(ledIntensitySelect(analogRead(LDR_PIN)));
+
     if (myDisplay.displayAnimate()) {
         myDisplay.displayReset();
         state = state == nama ? waktu : nama;
     }
 }
+
+float getTemp() {
+    return analogRead(LM35_PIN) / 2.0479;
+}
+
+void setTemp() {
+    float a = getTemp();
+
+    String t = "";
+    t += a;
+    t.toCharArray(buf, 100);
+}
+
 
 void setNama() {
     String n = NAMA;
@@ -96,4 +119,11 @@ void setTime() {
     date += myRTC.getSecond();
 
     date.toCharArray(buf, 100);
+}
+
+byte ledIntensitySelect(int light) {
+    int a = abs(light - 1023) * 16;
+    a /= 1023;
+    --a;
+    return abs(a);
 }
