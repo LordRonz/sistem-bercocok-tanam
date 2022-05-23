@@ -31,6 +31,8 @@ byte hour;
 byte minute;
 byte second;
 
+unsigned long timeAlive = 0;
+
 bool century = false;
 bool h12Flag;
 bool pmFlag;
@@ -39,6 +41,7 @@ String DASH = "-";
 String SPACE = " ";
 String COLON = ":";
 String EMPTY_STR = "";
+String temperature = EMPTY_STR;
 
 char *NAMA = "Aaron Christopher";
 char *NRP = "07211940000055";
@@ -104,19 +107,16 @@ void loop() {
     setTemp();
 
     myDisplay.print(toBePrinted);
-
-    delay(1500);
-
-    // if (myDisplay.displayAnimate()) {
-    //     myDisplay.displayReset();
-    //     state = state == nama ? waktu : nama;
-    // }
 }
 
 String getTemp() {
-    String temp = String((float)analogRead(LM35_PIN) / 2.0479);
-    
-    return temp.substring(0, 4);
+    unsigned long timeNow = millis();
+
+    if (timeAlive == 0 || timeNow - timeAlive >= 1000) {
+        temperature = String((float) analogRead(LM35_PIN) / 2.0479);
+        timeAlive = timeNow;
+    }
+    return temperature.substring(0, 4);
 }
 
 void setTemp() {
@@ -133,9 +133,14 @@ void setNama() {
 }
 
 String getTime() {
-    String time = EMPTY_STR + myRTC.getHour(h12Flag, pmFlag);
+    char buf[30];
+    int hour = myRTC.getHour(h12Flag, pmFlag);
+    sprintf(buf, "%02d", hour);
+    String time = EMPTY_STR + buf;
     time += COLON;
-    time += myRTC.getMinute();
+    int minute = myRTC.getMinute();
+    sprintf(buf, "%02d", minute);
+    time += buf;
 
     return time;
 }
