@@ -72,7 +72,9 @@ void setup() {
 
     setTime();
 
-    myDisplay.displayScroll(buf, PA_CENTER, PA_SCROLL_LEFT, 60);
+    // myDisplay.displayScroll(buf, PA_CENTER, PA_SCROLL_LEFT, 60);
+
+    Serial.println("Setup Complete!");
 }
 
 void loop() {
@@ -87,37 +89,42 @@ void loop() {
 
     myDisplay.setIntensity(ledIntensitySelect(analogRead(LDR_PIN)));
 
-    String toBePrinted;
+    String toBePrinted = EMPTY_STR;
 
     byte curSecond = myRTC.getSecond();
 
+    // Serial.println(getTemp());
+
     if ((curSecond >= 10 && curSecond <= 15) || (curSecond >= 40 && curSecond <= 45)) {
-        toBePrinted = "";
         toBePrinted += getTemp();
     } else {
-        toBePrinted = getTime();
+        toBePrinted += getTime();
     }
+
+    setTemp();
 
     myDisplay.print(toBePrinted);
 
-    if (myDisplay.displayAnimate()) {
-        myDisplay.displayReset();
-        state = state == nama ? waktu : nama;
-    }
+    delay(1500);
+
+    // if (myDisplay.displayAnimate()) {
+    //     myDisplay.displayReset();
+    //     state = state == nama ? waktu : nama;
+    // }
 }
 
-float getTemp() {
-    return analogRead(LM35_PIN) / 2.0479;
+String getTemp() {
+    String temp = String((float)analogRead(LM35_PIN) / 2.0479);
+    
+    return temp.substring(0, 4);
 }
 
 void setTemp() {
-    float a = getTemp();
-
-    String t = "";
-    t += a;
+    String t = EMPTY_STR;
+    t += getTemp();
+    Serial.println(t);
     t.toCharArray(buf, 100);
 }
-
 
 void setNama() {
     String n = NAMA;
@@ -130,7 +137,7 @@ String getTime() {
     time += COLON;
     time += myRTC.getMinute();
 
-    return time
+    return time;
 }
 
 void setTime() {
