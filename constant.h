@@ -5,12 +5,14 @@ extern bool century;
 extern bool h12Flag;
 extern bool pmFlag;
 
-extern String DASH;
-extern String SPACE;
-extern String COLON;
-extern String EMPTY_STR;
+extern const byte WAIT;
 
-extern char *NAMA;
-extern char *NRP;
+extern const String DASH;
+extern const String SPACE;
+extern const String COLON;
+extern const String EMPTY_STR;
+
+extern const char *NAMA;
+extern const char *NRP;
 
 #endif

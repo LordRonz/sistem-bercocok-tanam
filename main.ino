@@ -34,7 +34,7 @@ byte second;
 
 unsigned long timeAlive = 0;
 
-String temperature = EMPTY_STR;
+float temperature;
 
 char buf[100];
 
@@ -63,23 +63,14 @@ void setup() {
     // Clear the display:
     myDisplay.displayClear();
 
-    setTime();
+    myDisplay.setTextAlignment(PA_CENTER);
 
-    // myDisplay.displayScroll(buf, PA_CENTER, PA_SCROLL_LEFT, 60);
+    setTime();
 
     Serial.println("Setup Complete!");
 }
 
 void loop() {
-    switch(state) {
-        case nama:
-            setTemp();
-            break;
-        case waktu:
-            setTime();
-            break;
-    }
-
     myDisplay.setIntensity(ledIntensitySelect(analogRead(LDR_PIN)));
 
     String toBePrinted = EMPTY_STR;
@@ -97,16 +88,22 @@ void loop() {
     setTemp();
 
     myDisplay.print(toBePrinted);
+
+    delay(WAIT);
 }
 
 String getTemp() {
     unsigned long timeNow = millis();
-
     if (timeAlive == 0 || timeNow - timeAlive >= 1000) {
-        temperature = String((float) analogRead(LM35_PIN) / 2.0479);
+        temperature = (float)analogRead(LM35_PIN) / 2.0479;
         timeAlive = timeNow;
     }
-    return temperature.substring(0, 4);
+    String res;
+    res.concat(temperature);
+    res = res.substring(0, 4);
+    res.concat(" ");
+    res.concat("C");
+    return res;
 }
 
 void setTemp() {

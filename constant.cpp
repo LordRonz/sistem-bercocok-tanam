@@ -4,10 +4,12 @@ bool century = false;
 bool h12Flag = false;
 bool pmFlag = false;
 
-String DASH = "-";
-String SPACE = " ";
-String COLON = ":";
-String EMPTY_STR = "";
+const byte WAIT = 60;
 
-char *NAMA = "Aaron Christopher";
-char *NRP = "07211940000055";
+const String DASH = "-";
+const String SPACE = " ";
+const String COLON = ":";
+const String EMPTY_STR = "";
+
+const char *NAMA = "Aaron Christopher";
+const char *NRP = "07211940000055";
