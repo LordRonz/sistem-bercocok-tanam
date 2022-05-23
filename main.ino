@@ -41,6 +41,7 @@ String COLON = ":";
 String EMPTY_STR = "";
 
 char *NAMA = "Aaron Christopher";
+char *NRP = "07211940000055";
 
 char buf[100];
 
@@ -86,6 +87,19 @@ void loop() {
 
     myDisplay.setIntensity(ledIntensitySelect(analogRead(LDR_PIN)));
 
+    String toBePrinted;
+
+    byte curSecond = myRTC.getSecond();
+
+    if ((curSecond >= 10 && curSecond <= 15) || (curSecond >= 40 && curSecond <= 45)) {
+        toBePrinted = "";
+        toBePrinted += getTemp();
+    } else {
+        toBePrinted = getTime();
+    }
+
+    myDisplay.print(toBePrinted);
+
     if (myDisplay.displayAnimate()) {
         myDisplay.displayReset();
         state = state == nama ? waktu : nama;
@@ -111,14 +125,18 @@ void setNama() {
     n.toCharArray(buf, 100);
 }
 
-void setTime() {
-    String date = EMPTY_STR + myRTC.getHour(h12Flag, pmFlag);
-    date += COLON;
-    date += myRTC.getMinute();
-    date += COLON;
-    date += myRTC.getSecond();
+String getTime() {
+    String time = EMPTY_STR + myRTC.getHour(h12Flag, pmFlag);
+    time += COLON;
+    time += myRTC.getMinute();
 
-    date.toCharArray(buf, 100);
+    return time
+}
+
+void setTime() {
+    String time = getTime();
+
+    time.toCharArray(buf, 100);
 }
 
 byte ledIntensitySelect(int light) {
