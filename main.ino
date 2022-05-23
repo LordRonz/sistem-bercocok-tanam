@@ -5,6 +5,8 @@
 #include <MD_MAX72xx.h>
 #include <SPI.h>
 
+#include "constant.h"
+
 // MAX7219
 // Define hardware type, size, and output pins:
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
@@ -33,18 +35,7 @@ byte second;
 
 unsigned long timeAlive = 0;
 
-bool century = false;
-bool h12Flag;
-bool pmFlag;
-
-String DASH = "-";
-String SPACE = " ";
-String COLON = ":";
-String EMPTY_STR = "";
 String temperature = EMPTY_STR;
-
-char *NAMA = "Aaron Christopher";
-char *NRP = "07211940000055";
 
 char buf[100];
 
