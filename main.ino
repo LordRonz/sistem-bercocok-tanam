@@ -1,5 +1,4 @@
 #include <DS3231.h>
-#include <LowPower.h>
 #include <Wire.h>
 #include <MD_Parola.h>
 #include <MD_MAX72xx.h>
@@ -57,7 +56,7 @@ void setup() {
     myRTC.setMinute(0);
     myRTC.setSecond(0);
 
-    // Intialize the object:
+    // Initialize the object:
     myDisplay.begin();
     // Set the intensity (brightness) of the display (0-15):
     myDisplay.setIntensity(0);
