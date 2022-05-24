@@ -36,7 +36,7 @@ bool century = false;
 bool h12Flag = false;
 bool pmFlag = false;
 
-const byte WAIT = 60;
+const byte WAIT = 69;
 
 const String DASH = "-";
 const String SPACE = " ";
@@ -48,11 +48,10 @@ const char NRP[] PROGMEM = "07211940000055";
 
 unsigned long timeAlive = 0;
 unsigned long intensityThrottle = 0;
+unsigned long colonDelay = 0;
 
 float temperature;
-unsigned int ledIntensity = 0;
-
-char buf[100];
+byte ledIntensity = 0;
 
 enum State { nama, waktu };
 State state = waktu;
@@ -75,8 +74,6 @@ void setup() {
 
     myDisplay.setTextAlignment(PA_CENTER);
 
-    setTime();
-
     Serial.println(F("Setup Complete!"));
 }
 
@@ -88,7 +85,7 @@ void loop() {
 
     byte curSecond = myRTC.getSecond();
 
-    if ((curSecond >= 10 && curSecond <= 15) || (curSecond >= 40 && curSecond <= 45)) {
+    if ((curSecond >= 10 && curSecond < 15) || (curSecond >= 40 && curSecond < 45)) {
         toBePrinted += getTemp();
     } else {
         toBePrinted += getTime();
@@ -101,6 +98,17 @@ void loop() {
     }
 
     delay(WAIT);
+}
+
+String progmemCharsToString(const char* s) {
+    String res;
+    char buf[2];
+    for (byte k = 0; k < strlen_P(s); k++) {
+        buf[0] = pgm_read_byte_near(s + k);
+        buf[1] = '\0';
+        res.concat(buf);
+    }
+    return res;
 }
 
 void adjustClock(String data) {
@@ -131,36 +139,25 @@ String getTemp() {
     return res;
 }
 
-void setTemp() {
-    String t = EMPTY_STR;
-    t += getTemp();
-    Serial.println(t);
-    t.toCharArray(buf, 100);
-}
-
-void setNama() {
-    String n = NAMA;
-
-    n.toCharArray(buf, 100);
-}
-
 String getTime() {
     char buf[30];
     byte hour = myRTC.getHour(h12Flag, pmFlag);
     sprintf(buf, "%02d", hour);
     String time = EMPTY_STR + buf;
-    time += COLON;
+    unsigned long timeNow = millis();
+    if (timeNow - colonDelay >= 0 && timeNow - colonDelay <= 1000) {
+        time += COLON;
+    } else if (timeNow - colonDelay > 1000) {
+        time += SPACE;
+        if (timeNow - colonDelay >= 1500) {
+            colonDelay = timeNow;
+        }
+    }
     byte minute = myRTC.getMinute();
     sprintf(buf, "%02d", minute);
     time += buf;
 
     return time;
-}
-
-void setTime() {
-    String time = getTime();
-
-    time.toCharArray(buf, 100);
 }
 
 byte getLedIntensity(int light) {
@@ -172,7 +169,7 @@ byte getLedIntensity(int light) {
 
 void ledIntensitySelect(uint8_t ldrPin) {
     unsigned long timeNow = millis();
-    if (intensityThrottle == 0 || timeNow - intensityThrottle >= 1000) {
+    if (timeNow - intensityThrottle >= 1000) {
         int light = analogRead(ldrPin);
         ledIntensity = getLedIntensity(light);
         intensityThrottle = timeNow;
