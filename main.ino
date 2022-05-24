@@ -21,6 +21,9 @@
 #define KB_DATA_PIN 2
 #define KB_IRQ_PIN 3
 
+// Delay
+#define WAIT 69
+
 // Create a new instance of the MD_Parola class with hardware SPI connection:
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
 
@@ -28,15 +31,10 @@ PS2Keyboard keyboard;
 
 DS3231 myRTC;
 
-byte hour;
-byte minute;
-byte second;
-
-bool century = false;
 bool h12Flag = false;
 bool pmFlag = false;
 
-const byte WAIT = 69;
+byte ledIntensity = 0;
 
 const String DASH = "-";
 const String SPACE = " ";
@@ -49,9 +47,6 @@ const char NRP[] PROGMEM = "07211940000055";
 unsigned long timeAlive = 0;
 unsigned long intensityThrottle = 0;
 unsigned long colonDelay = 0;
-
-float temperature;
-byte ledIntensity = 0;
 
 enum State { nama, waktu };
 State state = waktu;
@@ -127,6 +122,7 @@ void adjustClock(String data) {
 
 String getTemp() {
     unsigned long timeNow = millis();
+    float temperature;
     if (timeAlive == 0 || timeNow - timeAlive >= 1000) {
         temperature = (float)analogRead(LM35_PIN) / 2.0479;
         timeAlive = timeNow;
@@ -169,6 +165,7 @@ byte getLedIntensity(int light) {
 
 void ledIntensitySelect(uint8_t ldrPin) {
     unsigned long timeNow = millis();
+
     if (timeNow - intensityThrottle >= 1000) {
         int light = analogRead(ldrPin);
         ledIntensity = getLedIntensity(light);
