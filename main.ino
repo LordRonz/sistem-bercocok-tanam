@@ -28,10 +28,6 @@ PS2Keyboard keyboard;
 
 DS3231 myRTC;
 
-byte year;
-byte month;
-byte date;
-byte dow;
 byte hour;
 byte minute;
 byte second;
@@ -47,12 +43,14 @@ const String SPACE = " ";
 const String COLON = ":";
 const String EMPTY_STR = "";
 
-const char *NAMA = "Aaron Christopher";
-const char *NRP = "07211940000055";
+const char NAMA[] PROGMEM = "Aaron Christopher";
+const char NRP[] PROGMEM = "07211940000055";
 
 unsigned long timeAlive = 0;
+unsigned long intensityThrottle = 0;
 
 float temperature;
+unsigned int ledIntensity = 0;
 
 char buf[100];
 
@@ -79,11 +77,12 @@ void setup() {
 
     setTime();
 
-    Serial.println("Setup Complete!");
+    Serial.println(F("Setup Complete!"));
 }
 
 void loop() {
-    myDisplay.setIntensity(ledIntensitySelect(analogRead(LDR_PIN)));
+    ledIntensitySelect(LDR_PIN);
+    myDisplay.setIntensity(ledIntensity);
 
     String toBePrinted = EMPTY_STR;
 
@@ -147,11 +146,11 @@ void setNama() {
 
 String getTime() {
     char buf[30];
-    int hour = myRTC.getHour(h12Flag, pmFlag);
+    byte hour = myRTC.getHour(h12Flag, pmFlag);
     sprintf(buf, "%02d", hour);
     String time = EMPTY_STR + buf;
     time += COLON;
-    int minute = myRTC.getMinute();
+    byte minute = myRTC.getMinute();
     sprintf(buf, "%02d", minute);
     time += buf;
 
@@ -164,9 +163,18 @@ void setTime() {
     time.toCharArray(buf, 100);
 }
 
-byte ledIntensitySelect(int light) {
+byte getLedIntensity(int light) {
     int a = abs(light - 1023) * 16;
     a /= 1023;
     --a;
     return abs(a);
+}
+
+void ledIntensitySelect(uint8_t ldrPin) {
+    unsigned long timeNow = millis();
+    if (intensityThrottle == 0 || timeNow - intensityThrottle >= 1000) {
+        int light = analogRead(ldrPin);
+        ledIntensity = getLedIntensity(light);
+        intensityThrottle = timeNow;
+    }
 }
