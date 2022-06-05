@@ -54,6 +54,8 @@ PS2Keyboard keyboard;
 DS3231 myRTC;
 
 byte ledIntensity;
+uint16_t ledDiscoDelay;
+uint16_t ledDiscoSet;
 
 unsigned long timeAlive;
 unsigned long intensityThrottle;
@@ -92,6 +94,7 @@ enum class STATE {
     SHALLOW_SLEEP,
     SETTING,
     TIME_MODE,
+    LED_MODE,
 };
 STATE programState;
 
@@ -100,6 +103,12 @@ enum class T_MODE {
     SEC
 };
 T_MODE timeMode;
+
+enum class LED_MODE {
+    NORMAL,
+    DISCO
+};
+LED_MODE ledMode;
 
 enum class M_STATE {
     JAM,
@@ -120,6 +129,7 @@ A_STATE alarmState;
 
 enum class S_STATE {
     TIME_MODE,
+    LED_MODE,
 };
 S_STATE settingState;
 
@@ -178,7 +188,11 @@ void loop() {
         myDisplay.displayClear();
     }
 
-    ledIntensitySelect(LDR_PIN);
+    if (ledMode == LED_MODE::NORMAL) {
+        ledIntensitySelect(LDR_PIN);
+    } else {
+        ledIntensityDisco(LDR_PIN);
+    }
     myDisplay.setIntensity(ledIntensity);
     myDisplay.setTextAlignment(PA_CENTER);
 
@@ -224,18 +238,16 @@ void loop() {
             case STATE::MENU: {
                 switch (menuState) {
                     case M_STATE::JAM:
-                        output = "JAM";
+                        output = "Jam";
                         break;
                     case M_STATE::ALARM:
-                        output = "ALARM";
+                        output = "Alarm";
                         break;
                     case M_STATE::TIMER:
-                        output = "TIMER";
+                        output = "Timer";
                         break;
                     case M_STATE::SETTING:
-                        output = "SETTING";
-                        isScrolling = true;
-                        scrollSpeed = 40;
+                        output = "Setting";
                         break;
                 }
                 break;
@@ -366,7 +378,13 @@ void loop() {
             case STATE::SETTING: {
                 switch (settingState) {
                     case S_STATE::TIME_MODE: {
-                        output = "MODE JAM";
+                        output = "Mode Jam";
+                        scrollSpeed = 40;
+                        isScrolling = true;
+                        break;
+                    }
+                    case S_STATE::LED_MODE: {
+                        output = "Mode LED";
                         scrollSpeed = 40;
                         isScrolling = true;
                         break;
@@ -384,6 +402,19 @@ void loop() {
                     }
                     case T_MODE::SEC: {
                         output = "Dengan detik";
+                        break;
+                    }
+                }
+                break;
+            }
+            case STATE::LED_MODE: {
+                switch (ledMode) {
+                    case LED_MODE::NORMAL: {
+                        output = "Normal";
+                        break;
+                    }
+                    case LED_MODE::DISCO: {
+                        output = "Disco";
                         break;
                     }
                 }
@@ -533,6 +564,15 @@ void ledIntensitySelect(const byte& ldrPin) {
         uint16_t light = analogRead(ldrPin);
         ledIntensity = getLedIntensity(light);
         intensityThrottle = timeNow;
+    }
+}
+
+void ledIntensityDisco(const byte& ldrPin) {
+    unsigned long timeNow = millis();
+    if (timeNow - ledDiscoSet >= ledDiscoDelay) {
+        ledIntensity = ledIntensity == 15 ? 0 : 15;
+        ledDiscoDelay = random(50, 1000);
+        ledDiscoSet = timeNow;
     }
 }
 
@@ -917,15 +957,33 @@ void keyboardHandler() {
         case STATE::SETTING: {
             if (key == PS2_LEFTARROW) {
                 switch (settingState) {
+                    case S_STATE::TIME_MODE: {
+                        settingState = S_STATE::LED_MODE;
+                        break;
+                    }
+                    case S_STATE::LED_MODE: {
+                        settingState = S_STATE::TIME_MODE;
+                        break;
+                    }
                 }
             } else if (key == PS2_RIGHTARROW) {
                 switch (settingState) {
+                    case S_STATE::TIME_MODE: {
+                        settingState = S_STATE::LED_MODE;
+                        break;
+                    }
+                    case S_STATE::LED_MODE: {
+                        settingState = S_STATE::TIME_MODE;
+                        break;
+                    }
                 }
             } else if (key == PS2_ESC) {
                 programState = STATE::MENU;
             } else if (key == PS2_ENTER) {
                 if (settingState == S_STATE::TIME_MODE) {
                     programState = STATE::TIME_MODE;
+                } else {
+                    programState = STATE::LED_MODE;
                 }
             }
             break;
@@ -950,6 +1008,36 @@ void keyboardHandler() {
                     }
                     case T_MODE::SEC: {
                         timeMode = T_MODE::NO_SEC;
+                        break;
+                    }
+                }
+            } else if (key == PS2_ESC) {
+                programState = STATE::SETTING;
+            } else if (key == PS2_ENTER) {
+                programState = STATE::TIME;
+            }
+            break;
+        }
+        case STATE::LED_MODE: {
+            if (key == PS2_LEFTARROW) {
+                switch (ledMode) {
+                    case LED_MODE::NORMAL: {
+                        ledMode = LED_MODE::DISCO;
+                        break;
+                    }
+                    case LED_MODE::DISCO: {
+                        ledMode = LED_MODE::NORMAL;
+                        break;
+                    }
+                }
+            } else if (key == PS2_RIGHTARROW) {
+                switch (ledMode) {
+                    case LED_MODE::NORMAL: {
+                        ledMode = LED_MODE::DISCO;
+                        break;
+                    }
+                    case LED_MODE::DISCO: {
+                        ledMode = LED_MODE::NORMAL;
                         break;
                     }
                 }
