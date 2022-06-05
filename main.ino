@@ -1,4 +1,5 @@
 #include <DS3231.h>
+#include <LowPower.h>
 #include <MD_MAX72xx.h>
 #include <MD_Parola.h>
 #include <PS2Keyboard.h>
@@ -28,6 +29,7 @@
 
 // Delay
 #define WAIT 69
+#define TIMEOUT 60000 * 5  // 5 mins timeour
 
 // string constants
 #define DASH String("-")
@@ -54,7 +56,7 @@ byte ledIntensity;
 
 unsigned long timeAlive;
 unsigned long intensityThrottle;
-unsigned long colonDelay;
+unsigned long lastInteraction;
 
 float temperature;
 
@@ -83,7 +85,8 @@ enum class STATE { TIME,
                    TIMER_ACTIVE,
                    TIMER_DONE,
                    SET_ALARM5,
-                   SLEEP };
+                   SLEEP,
+                   SHALLOW_SLEEP };
 STATE programState;
 
 enum class M_STATE { JAM,
@@ -143,8 +146,14 @@ void setup() {
 
 void loop() {
     if (programState == STATE::SLEEP) {
-        delay(WAIT);
+        LowPower.idle(SLEEP_FOREVER, ADC_OFF, TIMER2_OFF, TIMER1_OFF, TIMER0_OFF, SPI_OFF, USART0_OFF, TWI_OFF);
         return;
+    }
+
+    // Try to sleep on idle
+    if (programState != STATE::SHALLOW_SLEEP && millis() - lastInteraction > TIMEOUT) {
+        programState = STATE::SHALLOW_SLEEP;
+        myDisplay.displayClear();
     }
 
     ledIntensitySelect(LDR_PIN);
@@ -321,14 +330,32 @@ void loop() {
                 }
                 break;
             }
+            case STATE::SHALLOW_SLEEP: {
+                bool h12Flag = false;
+                bool pmFlag = false;
+                byte hour = myRTC.getHour(h12Flag, pmFlag);
+                byte minute = myRTC.getMinute();
+
+                for (byte j = 0; j < 5; ++j) {
+                    if (alarms[j].hour == hour && alarms[j].minute == minute && alarms[j].active) {
+                        programState = STATE::ALARM_ACTIVE;
+                        activeAlarm = j;
+                        alarmStartTime = millis();
+                        lastInteraction = alarmStartTime;
+                    }
+                }
+                break;
+            }
         }
 
-        if (!isScrolling) {
-            myDisplay.print(output);
-        } else {
-            output += SPACE;
-            if (myDisplay.displayAnimate()) {
-                myDisplay.displayText(output.c_str(), PA_CENTER, SCROLL_SPEED, 0, PA_SCROLL_LEFT);
+        if (programState != STATE::SHALLOW_SLEEP) {
+            if (!isScrolling) {
+                myDisplay.print(output);
+            } else {
+                output += SPACE;
+                if (myDisplay.displayAnimate()) {
+                    myDisplay.displayText(output.c_str(), PA_CENTER, SCROLL_SPEED, 0, PA_SCROLL_LEFT);
+                }
             }
         }
     }
@@ -422,7 +449,7 @@ void keyboardHandler() {
         return;
     }
     char key = keyboard.read();
-
+    lastInteraction = millis();
     switch (programState) {
         case STATE::TIME: {
             if (key == PS2_ENTER) {
@@ -433,7 +460,7 @@ void keyboardHandler() {
             }
             break;
         }
-        case STATE::MENU:
+        case STATE::MENU: {
             if (key == PS2_LEFTARROW) {
                 switch (menuState) {
                     case M_STATE::JAM:
@@ -471,7 +498,8 @@ void keyboardHandler() {
                 }
             }
             break;
-        case STATE::SET_TIME:
+        }
+        case STATE::SET_TIME: {
             if (key == PS2_ESC) {
                 programState = STATE::MENU;
             } else if (key >= '0' && key <= '9') {
@@ -521,6 +549,7 @@ void keyboardHandler() {
                 }
             }
             break;
+        }
         case STATE::SELECT_ALARM: {
             if (key == PS2_ESC) {
                 programState = STATE::MENU;
@@ -733,6 +762,10 @@ void keyboardHandler() {
             break;
         }
         case STATE::SLEEP: {
+            programState = STATE::TIME;
+            break;
+        }
+        case STATE::SHALLOW_SLEEP: {
             programState = STATE::TIME;
             break;
         }
