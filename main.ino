@@ -44,6 +44,7 @@
 
 // num constants
 #define TIMER_DONE_DUR 3000
+#define MAX_INPUT5 100
 
 // Create a new instance of the MD_Parola class with hardware SPI connection:
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
@@ -74,32 +75,53 @@ Alarm alarms[] = {
     {false},
     {false}};
 
-enum class STATE { TIME,
-                   MENU,
-                   SET_TIMER,
-                   SET_TIME,
-                   SELECT_ALARM,
-                   SET_ALARM,
-                   SET_DUR,
-                   ALARM_ACTIVE,
-                   TIMER_ACTIVE,
-                   TIMER_DONE,
-                   SET_ALARM5,
-                   SLEEP,
-                   SHALLOW_SLEEP };
+enum class STATE {
+    TIME,
+    MENU,
+    SET_TIMER,
+    SET_TIME,
+    SELECT_ALARM,
+    SET_ALARM,
+    SET_DUR,
+    ALARM_ACTIVE,
+    TIMER_ACTIVE,
+    TIMER_DONE,
+    SET_ALARM5,
+    PRE_SLEEP,
+    SLEEP,
+    SHALLOW_SLEEP,
+    SETTING,
+    TIME_MODE,
+};
 STATE programState;
 
-enum class M_STATE { JAM,
-                     ALARM,
-                     TIMER };
+enum class T_MODE {
+    NO_SEC,
+    SEC
+};
+T_MODE timeMode;
+
+enum class M_STATE {
+    JAM,
+    ALARM,
+    TIMER,
+    SETTING,
+};
 M_STATE menuState;
 
-enum class A_STATE { A1,
-                     A2,
-                     A3,
-                     A4,
-                     A5 };
+enum class A_STATE {
+    A1,
+    A2,
+    A3,
+    A4,
+    A5
+};
 A_STATE alarmState;
+
+enum class S_STATE {
+    TIME_MODE,
+};
+S_STATE settingState;
 
 String inputAlarmHours = "__";
 String inputAlarmMinutes = "__";
@@ -151,7 +173,7 @@ void loop() {
     }
 
     // Try to sleep on idle
-    if (programState != STATE::SHALLOW_SLEEP && millis() - lastInteraction > TIMEOUT) {
+    if (programState == STATE::TIME && millis() - lastInteraction > TIMEOUT) {
         programState = STATE::SHALLOW_SLEEP;
         myDisplay.displayClear();
     }
@@ -170,6 +192,7 @@ void loop() {
     {
         String output;
         bool isScrolling = false;
+        byte scrollSpeed = SCROLL_SPEED;
         switch (programState) {
             case STATE::TIME: {
                 bool h12Flag = false;
@@ -189,7 +212,12 @@ void loop() {
                 if ((curSecond >= 10 && curSecond < 10 + TEMP_DUR) || (curSecond >= 40 && curSecond < 40 + TEMP_DUR)) {
                     output = getTemp();
                 } else {
-                    output = getTime();
+                    if (timeMode == T_MODE::NO_SEC) {
+                        output = getTime();
+                    } else {
+                        output = getTime(true);
+                        isScrolling = true;
+                    }
                 }
                 break;
             }
@@ -203,6 +231,11 @@ void loop() {
                         break;
                     case M_STATE::TIMER:
                         output = "TIMER";
+                        break;
+                    case M_STATE::SETTING:
+                        output = "SETTING";
+                        isScrolling = true;
+                        scrollSpeed = 40;
                         break;
                 }
                 break;
@@ -330,6 +363,32 @@ void loop() {
                 }
                 break;
             }
+            case STATE::SETTING: {
+                switch (settingState) {
+                    case S_STATE::TIME_MODE: {
+                        output = "MODE JAM";
+                        scrollSpeed = 40;
+                        isScrolling = true;
+                        break;
+                    }
+                }
+                break;
+            }
+            case STATE::TIME_MODE: {
+                isScrolling = true;
+                scrollSpeed = 40;
+                switch (timeMode) {
+                    case T_MODE::NO_SEC: {
+                        output = "Tanpa detik";
+                        break;
+                    }
+                    case T_MODE::SEC: {
+                        output = "Dengan detik";
+                        break;
+                    }
+                }
+                break;
+            }
             case STATE::SHALLOW_SLEEP: {
                 bool h12Flag = false;
                 bool pmFlag = false;
@@ -352,9 +411,8 @@ void loop() {
             if (!isScrolling) {
                 myDisplay.print(output);
             } else {
-                output += SPACE;
                 if (myDisplay.displayAnimate()) {
-                    myDisplay.displayText(output.c_str(), PA_CENTER, SCROLL_SPEED, 0, PA_SCROLL_LEFT);
+                    myDisplay.displayScroll(output.c_str(), PA_LEFT, PA_SCROLL_LEFT, scrollSpeed);
                 }
             }
         }
@@ -365,6 +423,10 @@ void loop() {
         adjustClock(readStr);
     }
     delay(WAIT);
+}
+
+bool isStateChanged(STATE pState, T_MODE tState, M_STATE mState, A_STATE aState, S_STATE sState) {
+    return pState != programState || tState != timeMode || mState != menuState || aState != alarmState || sState != settingState;
 }
 
 void adjustClock(String& data) {
@@ -422,6 +484,43 @@ String getTime() {
     return time;
 }
 
+String getTimeNoBlink() {
+    char buf[8];
+    bool h12Flag = false;
+    bool pmFlag = false;
+
+    byte hour = myRTC.getHour(h12Flag, pmFlag);
+    sprintf(buf, "%02d", hour);
+    String time = EMPTY_STR + buf;
+
+    time += COLON;
+    byte minute = myRTC.getMinute();
+    sprintf(buf, "%02d", minute);
+    time += buf;
+
+    return time;
+}
+
+String getTime(bool withSecond) {
+    String time;
+    if (withSecond) {
+        time = getTimeNoBlink();
+        char buf[8];
+        time += COLON;
+        byte second = myRTC.getSecond();
+        sprintf(buf, "%02d", second);
+        time += buf;
+    } else {
+        time = getTime();
+        char buf[8];
+        time += getBlinkingString(COLON, 500);
+        byte second = myRTC.getSecond();
+        sprintf(buf, "%02d", second);
+        time += buf;
+    }
+    return time;
+}
+
 byte getLedIntensity(const uint16_t& light) {
     uint16_t a = (light * 16) / 1023;
     return max(a, 0);
@@ -448,6 +547,11 @@ void keyboardHandler() {
     if (!keyboard.available()) {
         return;
     }
+    STATE pState = programState;
+    T_MODE tState = timeMode;
+    M_STATE mState = menuState;
+    A_STATE aState = alarmState;
+    S_STATE sState = settingState;
     char key = keyboard.read();
     lastInteraction = millis();
     switch (programState) {
@@ -464,13 +568,16 @@ void keyboardHandler() {
             if (key == PS2_LEFTARROW) {
                 switch (menuState) {
                     case M_STATE::JAM:
-                        menuState = M_STATE::TIMER;
+                        menuState = M_STATE::SETTING;
                         break;
                     case M_STATE::ALARM:
                         menuState = M_STATE::JAM;
                         break;
                     case M_STATE::TIMER:
                         menuState = M_STATE::ALARM;
+                        break;
+                    case M_STATE::SETTING:
+                        menuState = M_STATE::TIMER;
                         break;
                 }
             } else if (key == PS2_RIGHTARROW) {
@@ -482,6 +589,9 @@ void keyboardHandler() {
                         menuState = M_STATE::TIMER;
                         break;
                     case M_STATE::TIMER:
+                        menuState = M_STATE::SETTING;
+                        break;
+                    case M_STATE::SETTING:
                         menuState = M_STATE::JAM;
                         break;
                 }
@@ -489,12 +599,23 @@ void keyboardHandler() {
                 menuState = M_STATE::JAM;
                 programState = STATE::TIME;
             } else if (key == PS2_ENTER) {
-                if (menuState == M_STATE::JAM) {
-                    programState = STATE::SET_TIME;
-                } else if (menuState == M_STATE::ALARM) {
-                    programState = STATE::SELECT_ALARM;
-                } else {
-                    programState = STATE::SET_TIMER;
+                switch (menuState) {
+                    case M_STATE::JAM: {
+                        programState = STATE::SET_TIME;
+                        break;
+                    }
+                    case M_STATE::ALARM: {
+                        programState = STATE::SELECT_ALARM;
+                        break;
+                    }
+                    case M_STATE::TIMER: {
+                        programState = STATE::SET_TIMER;
+                        break;
+                    }
+                    case M_STATE::SETTING: {
+                        programState = STATE::SETTING;
+                        break;
+                    }
                 }
             }
             break;
@@ -505,14 +626,23 @@ void keyboardHandler() {
             } else if (key >= '0' && key <= '9') {
                 switch (inputtedClock) {
                     case 0:
+                        if (key > '2') {
+                            break;
+                        }
                         inputClockHours = String(key) + String(inputClockHours[1]);
                         ++inputtedClock;
                         break;
                     case 1:
+                        if (inputClockHours[0] > '1' && key > '3') {
+                            break;
+                        }
                         inputClockHours = String(inputClockHours[0]) + String(key);
                         ++inputtedClock;
                         break;
                     case 2:
+                        if (key > '5') {
+                            break;
+                        }
                         inputClockMinutes = String(key) + String(inputClockMinutes[1]);
                         ++inputtedClock;
                         break;
@@ -599,16 +729,19 @@ void keyboardHandler() {
             break;
         }
         case STATE::SET_ALARM5: {
-            if (key == PS2_ENTER && alarm5Input.length() > 0) {
+            uint16_t inputLen = alarm5Input.length();
+            if (key == PS2_ENTER && inputLen > 0) {
                 programState = STATE::SET_ALARM;
             } else if (key == PS2_ESC) {
                 programState = STATE::SELECT_ALARM;
             } else if (key == PS2_BACKSPACE) {
-                if (alarm5Input.length() > 0) {
-                    alarm5Input.remove(alarm5Input.length() - 1, 1);
+                if (inputLen > 0) {
+                    alarm5Input.remove(inputLen - 1, 1);
                 }
             } else {
-                alarm5Input += String(key);
+                if (inputLen < 100) {
+                    alarm5Input += String(key);
+                }
             }
             break;
         }
@@ -619,14 +752,23 @@ void keyboardHandler() {
             } else if (key >= '0' && key <= '9') {
                 switch (inputtedAlarm) {
                     case 0:
+                        if (key > '2') {
+                            break;
+                        }
                         inputAlarmHours = String(key) + String(inputAlarmHours[1]);
                         ++inputtedAlarm;
                         break;
                     case 1:
+                        if (inputAlarmHours[0] > '1' && key > '3') {
+                            break;
+                        }
                         inputAlarmHours = String(inputAlarmHours[0]) + String(key);
                         ++inputtedAlarm;
                         break;
                     case 2:
+                        if (key > '5') {
+                            break;
+                        }
                         inputAlarmMinutes = String(key) + String(inputAlarmMinutes[1]);
                         ++inputtedAlarm;
                         break;
@@ -720,6 +862,9 @@ void keyboardHandler() {
                         ++inputtedTimer;
                         break;
                     case 2:
+                        if (inputTimerMinutes == String("99") && key > '5') {
+                            break;
+                        }
                         inputTimerSeconds = String(key) + String(inputTimerSeconds[1]);
                         ++inputtedTimer;
                         break;
@@ -769,5 +914,55 @@ void keyboardHandler() {
             programState = STATE::TIME;
             break;
         }
+        case STATE::SETTING: {
+            if (key == PS2_LEFTARROW) {
+                switch (settingState) {
+                }
+            } else if (key == PS2_RIGHTARROW) {
+                switch (settingState) {
+                }
+            } else if (key == PS2_ESC) {
+                programState = STATE::MENU;
+            } else if (key == PS2_ENTER) {
+                if (settingState == S_STATE::TIME_MODE) {
+                    programState = STATE::TIME_MODE;
+                }
+            }
+            break;
+        }
+        case STATE::TIME_MODE: {
+            if (key == PS2_LEFTARROW) {
+                switch (timeMode) {
+                    case T_MODE::NO_SEC: {
+                        timeMode = T_MODE::SEC;
+                        break;
+                    }
+                    case T_MODE::SEC: {
+                        timeMode = T_MODE::NO_SEC;
+                        break;
+                    }
+                }
+            } else if (key == PS2_RIGHTARROW) {
+                switch (timeMode) {
+                    case T_MODE::NO_SEC: {
+                        timeMode = T_MODE::SEC;
+                        break;
+                    }
+                    case T_MODE::SEC: {
+                        timeMode = T_MODE::NO_SEC;
+                        break;
+                    }
+                }
+            } else if (key == PS2_ESC) {
+                programState = STATE::SETTING;
+            } else if (key == PS2_ENTER) {
+                programState = STATE::TIME;
+            }
+            break;
+        }
+    }
+    if (isStateChanged(pState, tState, mState, aState, sState)) {
+        myDisplay.displayReset();
+        myDisplay.displayClear();
     }
 }
