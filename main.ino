@@ -460,6 +460,11 @@ bool isStateChanged(STATE pState, T_MODE tState, M_STATE mState, A_STATE aState,
     return pState != programState || tState != timeMode || mState != menuState || aState != alarmState || sState != settingState;
 }
 
+void clearResetDisplay() {
+    myDisplay.displayClear();
+    myDisplay.displayReset();
+}
+
 void adjustClock(String& data) {
     byte hour = data.substring(0, 2).toInt();
     byte min = data.substring(3, 5).toInt();
@@ -587,11 +592,6 @@ void keyboardHandler() {
     if (!keyboard.available()) {
         return;
     }
-    STATE pState = programState;
-    T_MODE tState = timeMode;
-    M_STATE mState = menuState;
-    A_STATE aState = alarmState;
-    S_STATE sState = settingState;
     char key = keyboard.read();
     lastInteraction = millis();
     switch (programState) {
@@ -654,6 +654,7 @@ void keyboardHandler() {
                     }
                     case M_STATE::SETTING: {
                         programState = STATE::SETTING;
+                        clearResetDisplay();
                         break;
                     }
                 }
@@ -966,6 +967,7 @@ void keyboardHandler() {
                         break;
                     }
                 }
+                clearResetDisplay();
             } else if (key == PS2_RIGHTARROW) {
                 switch (settingState) {
                     case S_STATE::TIME_MODE: {
@@ -977,6 +979,7 @@ void keyboardHandler() {
                         break;
                     }
                 }
+                clearResetDisplay();
             } else if (key == PS2_ESC) {
                 programState = STATE::MENU;
             } else if (key == PS2_ENTER) {
@@ -985,6 +988,7 @@ void keyboardHandler() {
                 } else {
                     programState = STATE::LED_MODE;
                 }
+                clearResetDisplay();
             }
             break;
         }
@@ -1000,6 +1004,7 @@ void keyboardHandler() {
                         break;
                     }
                 }
+                clearResetDisplay();
             } else if (key == PS2_RIGHTARROW) {
                 switch (timeMode) {
                     case T_MODE::NO_SEC: {
@@ -1011,8 +1016,10 @@ void keyboardHandler() {
                         break;
                     }
                 }
+                clearResetDisplay();
             } else if (key == PS2_ESC) {
                 programState = STATE::SETTING;
+                clearResetDisplay();
             } else if (key == PS2_ENTER) {
                 programState = STATE::TIME;
             }
@@ -1043,14 +1050,11 @@ void keyboardHandler() {
                 }
             } else if (key == PS2_ESC) {
                 programState = STATE::SETTING;
+                clearResetDisplay();
             } else if (key == PS2_ENTER) {
                 programState = STATE::TIME;
             }
             break;
         }
-    }
-    if (isStateChanged(pState, tState, mState, aState, sState)) {
-        myDisplay.displayReset();
-        myDisplay.displayClear();
     }
 }
