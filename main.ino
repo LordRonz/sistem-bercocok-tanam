@@ -44,7 +44,7 @@
 
 // num constants
 #define TIMER_DONE_DUR 3000
-#define MAX_INPUT5 100
+#define MAX_INPUT5 50
 
 // Create a new instance of the MD_Parola class with hardware SPI connection:
 MD_Parola myDisplay = MD_Parola(HARDWARE_TYPE, CS_PIN, MAX_DEVICES);
@@ -93,6 +93,7 @@ enum class STATE {
     SLEEP,
     SHALLOW_SLEEP,
     SETTING,
+    STOPWATCH,
     TIME_MODE,
     LED_MODE,
 };
@@ -100,13 +101,13 @@ STATE programState;
 
 enum class T_MODE {
     NO_SEC,
-    SEC
+    SEC,
 };
 T_MODE timeMode;
 
 enum class LED_MODE {
     NORMAL,
-    DISCO
+    DISCO,
 };
 LED_MODE ledMode;
 
@@ -114,6 +115,7 @@ enum class M_STATE {
     JAM,
     ALARM,
     TIMER,
+    STOPWATCH,
     SETTING,
 };
 M_STATE menuState;
@@ -123,7 +125,7 @@ enum class A_STATE {
     A2,
     A3,
     A4,
-    A5
+    A5,
 };
 A_STATE alarmState;
 
@@ -132,6 +134,12 @@ enum class S_STATE {
     LED_MODE,
 };
 S_STATE settingState;
+
+enum class W_STATE {
+    PAUSED,
+    STARTED,
+};
+W_STATE stopwatchState;
 
 String inputAlarmHours = "__";
 String inputAlarmMinutes = "__";
@@ -144,6 +152,8 @@ byte activeAlarm;
 unsigned long alarmStartTime;
 unsigned long timerStartTime;
 unsigned long timerDoneStartTime;
+unsigned long stopwatchCarry;
+uint16_t stopwatchTime;
 
 String inputTimerMinutes = "__";
 String inputTimerSeconds = "__";
@@ -206,7 +216,6 @@ void loop() {
     {
         String output;
         bool isScrolling = false;
-        byte scrollSpeed = SCROLL_SPEED;
         switch (programState) {
             case STATE::TIME: {
                 bool h12Flag = false;
@@ -248,6 +257,10 @@ void loop() {
                         break;
                     case M_STATE::SETTING:
                         output = "Setting";
+                        break;
+                    case M_STATE::STOPWATCH:
+                        output = "Stopwatch";
+                        isScrolling = true;
                         break;
                 }
                 break;
@@ -375,17 +388,28 @@ void loop() {
                 }
                 break;
             }
+            case STATE::STOPWATCH: {
+                uint16_t timePassed = millis() - stopwatchCarry;
+                switch (stopwatchState) {
+                    case W_STATE::STARTED: {
+                        stopwatchTime += timePassed;
+                    }
+                }
+                uint16_t sec = stopwatchTime / 1000;
+                uint16_t ms = (stopwatchTime - (sec * 1000)) / 10;
+                output = String(sec) + getBlinkingString(COLON, 500) + String(ms);
+                stopwatchCarry = millis();
+                break;
+            }
             case STATE::SETTING: {
                 switch (settingState) {
                     case S_STATE::TIME_MODE: {
                         output = "Mode Jam";
-                        scrollSpeed = 40;
                         isScrolling = true;
                         break;
                     }
                     case S_STATE::LED_MODE: {
                         output = "Mode LED";
-                        scrollSpeed = 40;
                         isScrolling = true;
                         break;
                     }
@@ -394,7 +418,6 @@ void loop() {
             }
             case STATE::TIME_MODE: {
                 isScrolling = true;
-                scrollSpeed = 40;
                 switch (timeMode) {
                     case T_MODE::NO_SEC: {
                         output = "Tanpa detik";
@@ -443,7 +466,7 @@ void loop() {
                 myDisplay.print(output);
             } else {
                 if (myDisplay.displayAnimate()) {
-                    myDisplay.displayScroll(output.c_str(), PA_LEFT, PA_SCROLL_LEFT, scrollSpeed);
+                    myDisplay.displayScroll(output.c_str(), PA_LEFT, PA_SCROLL_LEFT, SCROLL_SPEED);
                 }
             }
         }
@@ -454,10 +477,6 @@ void loop() {
         adjustClock(readStr);
     }
     delay(WAIT);
-}
-
-bool isStateChanged(STATE pState, T_MODE tState, M_STATE mState, A_STATE aState, S_STATE sState) {
-    return pState != programState || tState != timeMode || mState != menuState || aState != alarmState || sState != settingState;
 }
 
 void clearResetDisplay() {
@@ -608,7 +627,7 @@ void keyboardHandler() {
             if (key == PS2_LEFTARROW) {
                 switch (menuState) {
                     case M_STATE::JAM:
-                        menuState = M_STATE::SETTING;
+                        menuState = M_STATE::STOPWATCH;
                         break;
                     case M_STATE::ALARM:
                         menuState = M_STATE::JAM;
@@ -618,6 +637,9 @@ void keyboardHandler() {
                         break;
                     case M_STATE::SETTING:
                         menuState = M_STATE::TIMER;
+                        break;
+                    case M_STATE::STOPWATCH:
+                        menuState = M_STATE::SETTING;
                         break;
                 }
             } else if (key == PS2_RIGHTARROW) {
@@ -632,6 +654,9 @@ void keyboardHandler() {
                         menuState = M_STATE::SETTING;
                         break;
                     case M_STATE::SETTING:
+                        menuState = M_STATE::STOPWATCH;
+                        break;
+                    case M_STATE::STOPWATCH:
                         menuState = M_STATE::JAM;
                         break;
                 }
@@ -655,6 +680,11 @@ void keyboardHandler() {
                     case M_STATE::SETTING: {
                         programState = STATE::SETTING;
                         clearResetDisplay();
+                        break;
+                    }
+                    case M_STATE::STOPWATCH: {
+                        programState = STATE::STOPWATCH;
+                        stopwatchCarry = millis();
                         break;
                     }
                 }
@@ -886,6 +916,17 @@ void keyboardHandler() {
             if (key == PS2_ESC) {
                 programState = STATE::TIME;
                 alarms[activeAlarm].active = false;
+            }
+            break;
+        }
+        case STATE::STOPWATCH: {
+            if (key == PS2_ENTER) {
+                stopwatchState = stopwatchState == W_STATE::STARTED ? W_STATE::PAUSED : W_STATE::STARTED;
+            } else if (key == PS2_ESC) {
+                programState = STATE::MENU;
+            } else if (key == PS2_BACKSPACE) {
+                stopwatchState = W_STATE::PAUSED;
+                stopwatchTime = 0;
             }
             break;
         }
