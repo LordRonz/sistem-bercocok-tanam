@@ -14,7 +14,7 @@
 #define HARDWARE_TYPE MD_MAX72XX::FC16_HW
 #define MAX_DEVICES 4
 #define CS_PIN 10
-#define SCROLL_SPEED 60
+#define SCROLL_SPEED 30
 
 // LDR
 #define LDR_PIN A0
@@ -29,18 +29,18 @@
 
 // Delay
 #define WAIT 69
-#define TIMEOUT 60000 * 5  // 5 mins timeour
+#define TIMEOUT 60000 * 5  // 5 mins timeout
 
 // string constants
-#define DASH String("-")
-#define SPACE String(" ")
-#define COLON String(":")
-#define EMPTY_STR String("")
-#define NAME String("Aaron Christopher Tanhar")
-#define NRP String("07211940000055")
-#define LODASH String("_")
-#define DOUBLE_LODASH String("__")
-#define ELLIPSIS String("..")
+const String DASH = "-";
+const String SPACE = " ";
+const String COLON = ":";
+const String EMPTY_STR = "";
+const String NAME = "Aaron Christopher Tanhar";
+const String NRP = "07211940000055";
+const String LODASH = "_";
+const String DOUBLE_LODASH = "__";
+const String ELLIPSIS = "..";
 
 // num constants
 #define TIMER_DONE_DUR 3000
@@ -60,7 +60,9 @@ uint16_t ledDiscoSet;
 bool h12Flag;
 bool pmFlag;
 
+unsigned long tempThrottle;
 unsigned long lastInteraction;
+unsigned long intensityThrottle;
 
 float temperature;
 
@@ -496,14 +498,17 @@ void adjustClock(String& data) {
 }
 
 String getTemp() {
-    if (!temperature || ((millis() % 2000) < 69)) {
+    unsigned long timeNow = millis();
+    if (!temperature || timeNow - tempThrottle >= 2000) {
         do {
             temperature = (float)analogRead(LM35_PIN) / 2.0479;
         } while (temperature < 1);
+        tempThrottle = timeNow;
     }
     String res = String(temperature);
     res = res.substring(0, 4);
-    res += " C";
+    res += (char)176;
+    res += "C";
     return res;
 }
 
@@ -575,8 +580,13 @@ byte getLedIntensity(const uint16_t& light) {
 }
 
 void ledIntensitySelect(const byte& ldrPin) {
-    uint16_t light = analogRead(ldrPin);
-    ledIntensity = getLedIntensity(light);
+    unsigned long timeNow = millis();
+
+    if (timeNow - intensityThrottle >= 1000) {
+        uint16_t light = analogRead(ldrPin);
+        ledIntensity = getLedIntensity(light);
+        intensityThrottle = timeNow;
+    }
 }
 
 void ledIntensityDisco(const byte& ldrPin) {
@@ -643,6 +653,7 @@ void keyboardHandler() {
                         break;
                     case M_STATE::SETTING:
                         menuState = M_STATE::STOPWATCH;
+                        clearResetDisplay();
                         break;
                     case M_STATE::STOPWATCH:
                         menuState = M_STATE::JAM;
