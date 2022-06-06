@@ -57,8 +57,9 @@ byte ledIntensity;
 uint16_t ledDiscoDelay;
 uint16_t ledDiscoSet;
 
-unsigned long timeAlive;
-unsigned long intensityThrottle;
+bool h12Flag;
+bool pmFlag;
+
 unsigned long lastInteraction;
 
 float temperature;
@@ -218,8 +219,6 @@ void loop() {
         bool isScrolling = false;
         switch (programState) {
             case STATE::TIME: {
-                bool h12Flag = false;
-                bool pmFlag = false;
                 byte hour = myRTC.getHour(h12Flag, pmFlag);
                 byte minute = myRTC.getMinute();
 
@@ -365,15 +364,15 @@ void loop() {
                 }
                 switch (activeAlarm) {
                     case 0: {
-                        output = NAME;
-                        break;
-                    }
-                    case 1: {
                         output = NRP;
                         break;
                     }
+                    case 1: {
+                        output = NAME;
+                        break;
+                    }
                     case 2: {
-                        output = NAME + SPACE + NRP;
+                        output = NRP + SPACE + NAME;
                         break;
                     }
                     case 3: {
@@ -397,7 +396,9 @@ void loop() {
                 }
                 uint16_t sec = stopwatchTime / 1000;
                 uint16_t ms = (stopwatchTime - (sec * 1000)) / 10;
-                output = String(sec) + getBlinkingString(COLON, 500) + String(ms);
+                String outputSec = (sec < 10 ? "0" : "") + String(sec);
+                String outputMs = (ms < 10 ? "0" : "") + String(ms);
+                output = outputSec + COLON + outputMs;
                 stopwatchCarry = millis();
                 break;
             }
@@ -444,8 +445,6 @@ void loop() {
                 break;
             }
             case STATE::SHALLOW_SLEEP: {
-                bool h12Flag = false;
-                bool pmFlag = false;
                 byte hour = myRTC.getHour(h12Flag, pmFlag);
                 byte minute = myRTC.getMinute();
 
@@ -497,12 +496,10 @@ void adjustClock(String& data) {
 }
 
 String getTemp() {
-    unsigned long timeNow = millis();
-    if (!temperature || timeNow - timeAlive >= 2000) {
+    if (!temperature || ((millis() % 2000) < 69)) {
         do {
             temperature = (float)analogRead(LM35_PIN) / 2.0479;
         } while (temperature < 1);
-        timeAlive = timeNow;
     }
     String res = String(temperature);
     res = res.substring(0, 4);
@@ -524,8 +521,6 @@ String getBlinkingString(String initial, uint16_t delay, int spaceLength) {
 
 String getTime() {
     char buf[8];
-    bool h12Flag = false;
-    bool pmFlag = false;
 
     byte hour = myRTC.getHour(h12Flag, pmFlag);
     sprintf(buf, "%02d", hour);
@@ -541,8 +536,6 @@ String getTime() {
 
 String getTimeNoBlink() {
     char buf[8];
-    bool h12Flag = false;
-    bool pmFlag = false;
 
     byte hour = myRTC.getHour(h12Flag, pmFlag);
     sprintf(buf, "%02d", hour);
@@ -582,13 +575,8 @@ byte getLedIntensity(const uint16_t& light) {
 }
 
 void ledIntensitySelect(const byte& ldrPin) {
-    unsigned long timeNow = millis();
-
-    if (timeNow - intensityThrottle >= 1000) {
-        uint16_t light = analogRead(ldrPin);
-        ledIntensity = getLedIntensity(light);
-        intensityThrottle = timeNow;
-    }
+    uint16_t light = analogRead(ldrPin);
+    ledIntensity = getLedIntensity(light);
 }
 
 void ledIntensityDisco(const byte& ldrPin) {
@@ -801,8 +789,10 @@ void keyboardHandler() {
         }
         case STATE::SET_ALARM5: {
             uint16_t inputLen = alarm5Input.length();
-            if (key == PS2_ENTER && inputLen > 0) {
-                programState = STATE::SET_ALARM;
+            if (key == PS2_ENTER) {
+                if (inputLen > 0) {
+                    programState = STATE::SET_ALARM;
+                }
             } else if (key == PS2_ESC) {
                 programState = STATE::SELECT_ALARM;
             } else if (key == PS2_BACKSPACE) {
@@ -810,7 +800,7 @@ void keyboardHandler() {
                     alarm5Input.remove(inputLen - 1, 1);
                 }
             } else {
-                if (inputLen < 100) {
+                if (inputLen < MAX_INPUT5) {
                     alarm5Input += String(key);
                 }
             }
