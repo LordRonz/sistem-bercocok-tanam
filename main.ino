@@ -28,7 +28,7 @@
 #define KB_IRQ_PIN 3
 
 // Delay
-#define WAIT 69
+#define WAIT 50
 #define TIMEOUT 60000 * 5  // 5 mins timeout
 
 // string constants
@@ -499,7 +499,7 @@ void adjustClock(String& data) {
 
 String getTemp() {
     unsigned long timeNow = millis();
-    if (!temperature || timeNow - tempThrottle >= 2000) {
+    if (!temperature || timeNow - tempThrottle >= 1500) {
         do {
             temperature = (float)analogRead(LM35_PIN) / 2.0479;
         } while (temperature < 1);
@@ -795,6 +795,31 @@ void keyboardHandler() {
                 } else {
                     programState = STATE::SET_ALARM;
                 }
+            } else if (key == PS2_BACKSPACE) {
+                byte index;
+                switch (alarmState) {
+                    case A_STATE::A1: {
+                        index = 0;
+                        break;
+                    }
+                    case A_STATE::A2: {
+                        index = 1;
+                        break;
+                    }
+                    case A_STATE::A3: {
+                        index = 2;
+                        break;
+                    }
+                    case A_STATE::A4: {
+                        index = 3;
+                        break;
+                    }
+                    case A_STATE::A5: {
+                        index = 4;
+                        break;
+                    }
+                }
+                alarms[index].active = false;
             }
             break;
         }
