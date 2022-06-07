@@ -31,17 +31,6 @@
 #define WAIT 50
 #define TIMEOUT 60000 * 5  // 5 mins timeout
 
-// string constants
-const String DASH = "-";
-const String SPACE = " ";
-const String COLON = ":";
-const String EMPTY_STR = "";
-const String NAME = "Aaron Christopher Tanhar";
-const String NRP = "07211940000055";
-const String LODASH = "_";
-const String DOUBLE_LODASH = "__";
-const String ELLIPSIS = "..";
-
 // num constants
 #define TIMER_DONE_DUR 3000
 #define MAX_INPUT5 50
@@ -204,7 +193,7 @@ void loop() {
     if (ledMode == LED_MODE::NORMAL) {
         ledIntensitySelect(LDR_PIN);
     } else {
-        ledIntensityDisco(LDR_PIN);
+        ledIntensityDisco();
     }
     myDisplay.setIntensity(ledIntensity);
     myDisplay.setTextAlignment(PA_CENTER);
@@ -267,16 +256,16 @@ void loop() {
                 break;
             }
             case STATE::SET_TIMER: {
-                output = inputTimerMinutes + COLON + inputTimerSeconds;
+                output = inputTimerMinutes + ":" + inputTimerSeconds;
                 if (inputtedTimer < 4) {
-                    output.setCharAt(inputtedTimer < 2 ? inputtedTimer : inputtedTimer + 1, getBlinkingString("|", 500, 1)[0]);
+                    output.setCharAt(inputtedTimer < 2 ? inputtedTimer : inputtedTimer + 1, getBlinkingString("|", 500)[0]);
                 }
                 break;
             }
             case STATE::SET_TIME: {
-                output = inputClockHours + COLON + inputClockMinutes;
+                output = inputClockHours + ":" + inputClockMinutes;
                 if (inputtedClock < 4) {
-                    output.setCharAt(inputtedClock < 2 ? inputtedClock : inputtedClock + 1, getBlinkingString("|", 500, 1)[0]);
+                    output.setCharAt(inputtedClock < 2 ? inputtedClock : inputtedClock + 1, getBlinkingString("|", 500)[0]);
                 }
                 break;
             }
@@ -310,16 +299,16 @@ void loop() {
                     String temp;
                     do {
                         output.remove(0, 1);
-                        temp = ELLIPSIS + output;
+                        temp = ".." + output;
                     } while (myDisplay.getTextColumns(temp.c_str()) > width);
                     output = temp;
                 }
                 break;
             }
             case STATE::SET_ALARM: {
-                output = inputAlarmHours + COLON + inputAlarmMinutes;
+                output = inputAlarmHours + ":" + inputAlarmMinutes;
                 if (inputtedAlarm < 4) {
-                    output.setCharAt(inputtedAlarm < 2 ? inputtedAlarm : inputtedAlarm + 1, getBlinkingString("|", 500, 1)[0]);
+                    output.setCharAt(inputtedAlarm < 2 ? inputtedAlarm : inputtedAlarm + 1, getBlinkingString("|", 500)[0]);
                 }
                 break;
             }
@@ -345,7 +334,7 @@ void loop() {
                 if (secsOutput.length() < 2) {
                     secsOutput = "0" + secsOutput;
                 }
-                output = minsOutput + getBlinkingString(COLON, 500) + secsOutput;
+                output = minsOutput + getBlinkingString(":", 500) + secsOutput;
                 break;
             }
             case STATE::TIMER_DONE: {
@@ -354,7 +343,7 @@ void loop() {
                     programState = STATE::TIME;
                 }
 
-                output = (timePassed / 500) & 1 ? EMPTY_STR : "DONE";
+                output = (timePassed / 500) & 1 ? "" : "DONE";
                 break;
             }
             case STATE::ALARM_ACTIVE: {
@@ -366,15 +355,16 @@ void loop() {
                 }
                 switch (activeAlarm) {
                     case 0: {
-                        output = NRP;
+                        output = "07211940000055";
                         break;
                     }
                     case 1: {
-                        output = NAME;
+                        output = "Aaron Christopher Tanhar";
                         break;
                     }
                     case 2: {
-                        output = NRP + SPACE + NAME;
+                        output = "07211940000055 ";
+                        output += "Aaron Christopher Tanhar";
                         break;
                     }
                     case 3: {
@@ -400,7 +390,7 @@ void loop() {
                 uint16_t ms = (stopwatchTime - (sec * 1000)) / 10;
                 String outputSec = (sec < 10 ? "0" : "") + String(sec);
                 String outputMs = (ms < 10 ? "0" : "") + String(ms);
-                output = outputSec + COLON + outputMs;
+                output = outputSec + ":" + outputMs;
                 stopwatchCarry = millis();
                 break;
             }
@@ -502,7 +492,7 @@ String getTemp() {
     if (!temperature || timeNow - tempThrottle >= 1500) {
         do {
             temperature = (float)analogRead(LM35_PIN) / 2.0479;
-        } while (temperature < 1);
+        } while (temperature < 1 || abs(myRTC.getTemperature() - temperature) > 2);
         tempThrottle = timeNow;
     }
     String res = String(temperature);
@@ -513,15 +503,7 @@ String getTemp() {
 }
 
 String getBlinkingString(String initial, uint16_t delay) {
-    return (millis() / delay) & 1 ? initial : SPACE;
-}
-
-String getBlinkingString(String initial, uint16_t delay, int spaceLength) {
-    String spaces;
-    for (byte i = 0; i < spaceLength; ++i) {
-        spaces += SPACE;
-    }
-    return (millis() / delay) & 1 ? initial : spaces;
+    return (millis() / delay) & 1 ? initial : " ";
 }
 
 String getTime() {
@@ -529,9 +511,9 @@ String getTime() {
 
     byte hour = myRTC.getHour(h12Flag, pmFlag);
     sprintf(buf, "%02d", hour);
-    String time = EMPTY_STR + buf;
+    String time = buf;
 
-    time += getBlinkingString(COLON, 500);
+    time += getBlinkingString(":", 500);
     byte minute = myRTC.getMinute();
     sprintf(buf, "%02d", minute);
     time += buf;
@@ -544,9 +526,9 @@ String getTimeNoBlink() {
 
     byte hour = myRTC.getHour(h12Flag, pmFlag);
     sprintf(buf, "%02d", hour);
-    String time = EMPTY_STR + buf;
+    String time = buf;
 
-    time += COLON;
+    time += ":";
     byte minute = myRTC.getMinute();
     sprintf(buf, "%02d", minute);
     time += buf;
@@ -559,14 +541,14 @@ String getTime(bool withSecond) {
     if (withSecond) {
         time = getTimeNoBlink();
         char buf[8];
-        time += COLON;
+        time += ":";
         byte second = myRTC.getSecond();
         sprintf(buf, "%02d", second);
         time += buf;
     } else {
         time = getTime();
         char buf[8];
-        time += getBlinkingString(COLON, 500);
+        time += getBlinkingString(":", 500);
         byte second = myRTC.getSecond();
         sprintf(buf, "%02d", second);
         time += buf;
@@ -589,20 +571,13 @@ void ledIntensitySelect(const byte& ldrPin) {
     }
 }
 
-void ledIntensityDisco(const byte& ldrPin) {
+void ledIntensityDisco() {
     unsigned long timeNow = millis();
     if (timeNow - ledDiscoSet >= ledDiscoDelay) {
         ledIntensity = ledIntensity == 15 ? 0 : 15;
         ledDiscoDelay = random(50, 1000);
         ledDiscoSet = timeNow;
     }
-}
-
-void resetAlarmInput() {
-    inputtedAlarm = 0;
-    inputAlarmHours = "__";
-    inputAlarmMinutes = "__";
-    inputAlarmDuration = 0;
 }
 
 void keyboardHandler() {
@@ -845,7 +820,6 @@ void keyboardHandler() {
         case STATE::SET_ALARM: {
             if (key == PS2_ESC) {
                 programState = alarmState != A_STATE::A5 ? STATE::SELECT_ALARM : STATE::SET_ALARM5;
-                resetAlarmInput();
             } else if (key >= '0' && key <= '9') {
                 switch (inputtedAlarm) {
                     case 0:
@@ -877,19 +851,19 @@ void keyboardHandler() {
             } else if (key == PS2_BACKSPACE) {
                 switch (inputtedAlarm) {
                     case 1:
-                        inputAlarmHours = DOUBLE_LODASH;
+                        inputAlarmHours = "__";
                         --inputtedAlarm;
                         break;
                     case 2:
-                        inputAlarmHours = String(inputAlarmHours[0]) + LODASH;
+                        inputAlarmHours = String(inputAlarmHours[0]) + "_";
                         --inputtedAlarm;
                         break;
                     case 3:
-                        inputAlarmMinutes = DOUBLE_LODASH;
+                        inputAlarmMinutes = "__";
                         --inputtedAlarm;
                         break;
                     case 4:
-                        inputAlarmMinutes = String(inputAlarmMinutes[0]) + LODASH;
+                        inputAlarmMinutes = String(inputAlarmMinutes[0]) + "_";
                         --inputtedAlarm;
                         break;
                 }
@@ -932,7 +906,6 @@ void keyboardHandler() {
                     alarms[index].hour = inputAlarmHours.toInt();
                     alarms[index].minute = inputAlarmMinutes.toInt();
                     alarms[index].dur = inputAlarmDuration;
-                    resetAlarmInput();
                     programState = STATE::TIME;
                 }
             }
@@ -984,19 +957,19 @@ void keyboardHandler() {
             } else if (key == PS2_BACKSPACE) {
                 switch (inputtedTimer) {
                     case 1:
-                        inputTimerMinutes = DOUBLE_LODASH;
+                        inputTimerMinutes = "__";
                         --inputtedTimer;
                         break;
                     case 2:
-                        inputTimerMinutes = String(inputTimerMinutes[0]) + LODASH;
+                        inputTimerMinutes = String(inputTimerMinutes[0]) + "_";
                         --inputtedTimer;
                         break;
                     case 3:
-                        inputTimerSeconds = DOUBLE_LODASH;
+                        inputTimerSeconds = "__";
                         --inputtedTimer;
                         break;
                     case 4:
-                        inputTimerSeconds = String(inputTimerSeconds[0]) + LODASH;
+                        inputTimerSeconds = String(inputTimerSeconds[0]) + "_";
                         --inputtedTimer;
                         break;
                 }
